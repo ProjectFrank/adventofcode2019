@@ -1,40 +1,5 @@
 use std::fs;
 
-struct Operands {
-    x: usize,
-    y: usize,
-    position_to_set: usize,
-}
-
-impl Operands {
-    fn opcode_1(&self, intcode: &mut Vec<usize>) {
-        intcode[self.position_to_set] = self.x + self.y;
-    }
-
-    fn opcode_2(&self, intcode: &mut Vec<usize>) {
-        intcode[self.position_to_set] = self.x * self.y;
-    }
-
-    fn new(intcode: &Vec<usize>, position: usize) -> Result<Operands, String> {
-        let len = intcode.len();
-        if position + 1 >= len
-            || position + 2 >= len
-            || position + 3 >= len
-            || intcode[position + 1] >= len
-            || intcode[position + 2] >= len
-            || intcode[position + 3] >= len
-        {
-            Err(String::from("index out of bounds"))
-        } else {
-            Ok(Operands {
-                x: intcode[intcode[position + 1]],
-                y: intcode[intcode[position + 2]],
-                position_to_set: intcode[position + 3],
-            })
-        }
-    }
-}
-
 pub fn parse_intcode(code: &str) -> Vec<usize> {
     code.split(',').map(|item| item.parse().unwrap()).collect()
 }
@@ -47,6 +12,44 @@ pub fn read_file(path: &str) -> String {
         .collect()
 }
 
+fn opcode_1(intcode: &mut Vec<usize>, position: usize) -> Result<(), String> {
+    let len = intcode.len();
+    if position + 1 >= len
+        || position + 2 >= len
+        || position + 3 >= len
+        || intcode[position + 1] >= len
+        || intcode[position + 2] >= len
+        || intcode[position + 3] >= len
+    {
+        Err(String::from("index out of bounds"))
+    } else {
+        let position_to_set = intcode[position + 3];
+        let addend1 = intcode[intcode[position + 1]];
+        let addend2 = intcode[intcode[position + 2]];
+        intcode[position_to_set] = addend1 + addend2;
+        Ok(())
+    }
+}
+
+fn opcode_2(intcode: &mut Vec<usize>, position: usize) -> Result<(), String> {
+    let len = intcode.len();
+    if position + 1 >= len
+        || position + 2 >= len
+        || position + 3 >= len
+        || intcode[position + 1] >= len
+        || intcode[position + 2] >= len
+        || intcode[position + 3] >= len
+    {
+        Err(String::from("index out of bounds"))
+    } else {
+        let position_to_set = intcode[position + 3];
+        let factor1 = intcode[intcode[position + 1]];
+        let factor2 = intcode[intcode[position + 2]];
+        intcode[position_to_set] = factor1 * factor2;
+        Ok(())
+    }
+}
+
 pub fn process_inputs(noun: usize, verb: usize, intcode: &mut Vec<usize>) -> Result<usize, String> {
     let mut position = 0;
 
@@ -54,17 +57,13 @@ pub fn process_inputs(noun: usize, verb: usize, intcode: &mut Vec<usize>) -> Res
     intcode[2] = verb;
 
     while position < intcode.len() {
-        if let Ok(operands) = Operands::new(&intcode, position) {
-            match intcode[position] {
-                1 => operands.opcode_1(intcode),
-                2 => operands.opcode_2(intcode),
-                99 => return Ok(intcode[0]),
-                _ => return Err(String::from("Unrecognized intcode")),
-            }
-            position += 4;
-        } else {
-            return Err(String::from("index out of bounds"));
+        match intcode[position] {
+            1 => opcode_1(intcode, position)?,
+            2 => opcode_2(intcode, position)?,
+            99 => return Ok(intcode[0]),
+            _ => return Err(String::from("Unrecognized intcode")),
         }
+        position += 4;
     }
 
     Err(String::from("EOF error"))
@@ -76,16 +75,14 @@ mod tests {
     #[test]
     fn opcode_1_test() {
         let mut intcode = parse_intcode("1,9,10,3,2,3,11,0,99,30,40,50");
-        let operands = Operands::new(&intcode, 0).unwrap();
-        operands.opcode_1(&mut intcode);
+        opcode_1(&mut intcode, 0).unwrap();
         assert_eq!(vec![1, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], intcode);
     }
 
     #[test]
     fn opcode_2_test() {
         let mut intcode = parse_intcode("1,9,10,70,2,3,11,0,99,30,40,50");
-        let operands = Operands::new(&intcode, 4).unwrap();
-        operands.opcode_2(&mut intcode);
+        opcode_2(&mut intcode, 4).unwrap();
         assert_eq!(vec![3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], intcode);
     }
 }
