@@ -4,7 +4,7 @@ use day2::*;
 fn main() {
     let path: String = env::args().skip(1).next().unwrap();
 
-    let result = pt1(&path);
+    let result = pt2(&path, 19690720);
     
-    println!("{}", result[0]);
+    println!("{:?}", result);
 }
