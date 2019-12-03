@@ -9,7 +9,7 @@ fn try_input(noun: usize, verb: usize, intcode: &Vec<usize>, required_output: us
     let mut intcode = intcode.clone();
     match intcode::process_inputs(noun, verb, &mut intcode) {
         Ok(val) => val == required_output,
-        _ => false
+        _ => false,
     }
 }
 
@@ -19,11 +19,11 @@ pub fn pt2(path_to_input: &str, required_output: usize) -> Option<(usize, usize)
     for i in 0..1000 {
         for j in 0..1000 {
             if try_input(i, j, &intcode, required_output) {
-                return Some((i, j))
+                return Some((i, j));
             }
         }
     }
-    return None
+    return None;
 }
 
 #[cfg(test)]

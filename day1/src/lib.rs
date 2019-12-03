@@ -1,5 +1,5 @@
-use std::io::{BufRead, BufReader, Error};
 use std::fs::File;
+use std::io::{BufRead, BufReader, Error};
 
 fn read_file(path: &str) -> Result<BufReader<File>, Error> {
     let file = File::open(path)?;
@@ -23,18 +23,16 @@ fn fuel_cost(mass: i32) -> i32 {
 }
 
 fn naive_total_fuel_cost(reader: BufReader<File>) -> i32 {
-    reader.lines()
-        .map(|line| {
-            naive_fuel_cost(line.unwrap().parse().unwrap())
-        })
+    reader
+        .lines()
+        .map(|line| naive_fuel_cost(line.unwrap().parse().unwrap()))
         .sum()
 }
 
 fn total_fuel_cost(reader: BufReader<File>) -> i32 {
-    reader.lines()
-        .map(|line| {
-            fuel_cost(line.unwrap().parse().unwrap())
-        })
+    reader
+        .lines()
+        .map(|line| fuel_cost(line.unwrap().parse().unwrap()))
         .sum()
 }
 
