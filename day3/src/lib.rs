@@ -3,22 +3,29 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Error};
 
 #[derive(Debug, Clone, PartialEq)]
-struct Point(i32, i32);
+struct Point {
+    pub x: i32,
+    pub y: i32
+}
 
 impl Point {
     fn transform(&self, v: &Vector) -> Point {
         match v {
-            Vector::Up(delta_y) => Point(self.0, self.1 + delta_y),
-            Vector::Right(delta_x) => Point(self.0 + delta_x, self.1),
+            Vector::Up(delta_y) => Point::new(self.x, self.y + delta_y),
+            Vector::Right(delta_x) => Point::new(self.x + delta_x, self.y),
         }
     }
 
     fn distance_from_origin(&self) -> i32 {
-        self.0.abs() + self.1.abs()
+        self.x.abs() + self.y.abs()
     }
 
-    fn distance_from_point(&self, p: &Point) -> i32 {
-        (self.0 - p.0).abs() + (self.1 - p.1).abs()
+    fn distance_from_point(&self, p: &Self) -> i32 {
+        (self.x - p.x).abs() + (self.y - p.y).abs()
+    }
+
+    fn new(x: i32, y: i32) -> Self {
+        Self{x, y}
     }
 }
 
@@ -29,59 +36,62 @@ enum Direction {
 }
 
 #[derive(Debug, PartialEq)]
-struct LineSegment(Point, Point);
+struct LineSegment {
+    pub head: Point,
+    pub tail: Point
+}
 
 impl LineSegment {
     fn direction(&self) -> Direction {
-        if self.0 .0 == self.1 .0 {
+        if self.tail.x == self.head.x {
             Direction::Vertical
-        } else if self.0 .1 == self.1 .1 {
+        } else if self.tail.y == self.head.y {
             Direction::Horizontal
         } else {
             panic!("Cannot handle diagonal line")
         }
     }
 
-    fn intersection(&self, other: &LineSegment) -> Option<Point> {
+    fn intersection(&self, other: &Self) -> Option<Point> {
         if self.direction() == other.direction() {
             None
         } else if self.direction() == Direction::Horizontal
-            && other.0 .0 <= cmp::max(self.0 .0, self.1 .0)
-            && other.0 .0 >= cmp::min(self.0 .0, self.1 .0)
-            && self.0 .1 <= cmp::max(other.0 .1, other.1 .1)
-            && self.0 .1 >= cmp::min(other.0 .1, other.1 .1)
+            && other.tail.x <= cmp::max(self.tail.x, self.head.x)
+            && other.tail.x >= cmp::min(self.tail.x, self.head.x)
+            && self.tail.y <= cmp::max(other.tail.y, other.head.y)
+            && self.tail.y >= cmp::min(other.tail.y, other.head.y)
         {
-            Some(Point(other.0 .0, self.0 .1))
+            Some(Point::new(other.tail.x, self.tail.y))
         } else if self.direction() == Direction::Vertical
-            && self.0 .0 <= cmp::max(other.0 .0, other.1 .0)
-            && self.0 .0 >= cmp::min(other.0 .0, other.1 .0)
-            && other.0 .1 <= cmp::max(self.0 .1, self.1 .1)
-            && other.0 .1 >= cmp::min(self.0 .1, self.1 .1)
         {
-            Some(Point(self.0 .0, other.0 .1))
+            other.intersection(self)
         } else {
             None
         }
     }
 
     fn length(&self) -> i32 {
-        self.0.distance_from_point(&self.1)
+        self.tail.distance_from_point(&self.head)
     }
 
     /// returns true if point is on the line segment, false otherwise.
     fn includes(&self, p: &Point) -> bool {
         match self.direction() {
             Direction::Vertical => {
-                p.0 == self.0 .0
-                    && p.1 <= cmp::max(self.0 .1, self.1 .1)
-                    && p.1 >= cmp::min(self.0 .1, self.1 .1)
+                p.x == self.tail.x
+                    && p.y <= cmp::max(self.tail.y, self.head.y)
+                    && p.y >= cmp::min(self.tail.y, self.head.y)
             }
             Direction::Horizontal => {
-                p.1 == self.0 .1
-                    && p.0 <= cmp::max(self.0 .0, self.1 .0)
-                    && p.0 >= cmp::min(self.0 .0, self.1 .0)
+                p.y == self.tail.y
+                    && p.x <= cmp::max(self.tail.x, self.head.x)
+                    && p.x >= cmp::min(self.tail.x, self.head.x)
             }
         }
+    }
+
+    fn new(tail: Point, head: Point) -> Self {
+        Self{tail, head}
     }
 }
 
@@ -109,9 +119,9 @@ fn parse_directions(path: &str) -> Vec<LineSegment> {
     let mut result = Vec::new();
     path.split(',')
         .map(|s| Vector::from_string(s))
-        .fold(Point(0, 0), |last_point, v| {
+        .fold(Point::new(0, 0), |last_point, v| {
             let new_point = last_point.transform(&v);
-            let new_segment = LineSegment(last_point, new_point.clone());
+            let new_segment = LineSegment::new(last_point, new_point.clone());
             result.push(new_segment);
             new_point
         });
@@ -135,7 +145,7 @@ fn steps_to_point(lines: &Vec<LineSegment>, point: &Point) -> i32 {
     let mut steps = 0;
     for line in lines {
         if line.includes(point) {
-            return steps + line.0.distance_from_point(point);
+            return steps + line.tail.distance_from_point(point);
         } else {
             steps += line.length();
         }
@@ -148,7 +158,7 @@ fn closest_intersection_steps(lines1: &Vec<LineSegment>, lines2: &Vec<LineSegmen
     for line1 in lines1 {
         for line2 in lines2 {
             if let Some(intersection) = line1.intersection(&line2) {
-                if intersection != Point(0, 0) {
+                if intersection != Point::new(0, 0) {
                     let total_steps = steps_to_point(lines1, &intersection)
                         + steps_to_point(lines2, &intersection);
                     if total_steps < closest_total_steps {
@@ -166,7 +176,7 @@ fn closest_intersection_steps(lines1: &Vec<LineSegment>, lines2: &Vec<LineSegmen
     }
 }
 
-fn pt2(path_to_input: &str) -> Result<Option<i32>, Error> {
+pub fn pt2(path_to_input: &str) -> Result<Option<i32>, Error> {
     let (lines1, lines2) = parse_file(path_to_input)?;
     Ok(closest_intersection_steps(&lines1, &lines2))
 }
@@ -193,7 +203,7 @@ fn closest_intersection_distance(
     }
 }
 
-fn pt1(path_to_input: &str) -> Result<Option<i32>, Error> {
+pub fn pt1(path_to_input: &str) -> Result<Option<i32>, Error> {
     let (lines1, lines2) = parse_file(path_to_input)?;
     Ok(closest_intersection_distance(&lines1, &lines2))
 }
@@ -208,40 +218,40 @@ mod tests {
         assert_eq!(
             parse_directions(path),
             vec![
-                LineSegment(Point(0, 0), Point(75, 0)),
-                LineSegment(Point(75, 0), Point(75, -30)),
-                LineSegment(Point(75, -30), Point(158, -30))
+                LineSegment::new(Point::new(0, 0), Point::new(75, 0)),
+                LineSegment::new(Point::new(75, 0), Point::new(75, -30)),
+                LineSegment::new(Point::new(75, -30), Point::new(158, -30))
             ]
         );
     }
 
     #[test]
     fn direction_test() {
-        let horizontal_line = LineSegment(Point(-1, 1), Point(5, 1));
+        let horizontal_line = LineSegment::new(Point::new(-1, 1), Point::new(5, 1));
         assert_eq!(Direction::Horizontal, horizontal_line.direction());
 
-        let vertical_line = LineSegment(Point(-1, 1), Point(-1, -7));
+        let vertical_line = LineSegment::new(Point::new(-1, 1), Point::new(-1, -7));
         assert_eq!(Direction::Vertical, vertical_line.direction());
     }
 
     #[test]
     #[should_panic]
     fn diagonal_direction_test() {
-        let diagonal_line = LineSegment(Point(-1, 1), Point(5, -7));
+        let diagonal_line = LineSegment::new(Point::new(-1, 1), Point::new(5, -7));
         diagonal_line.direction();
     }
 
     #[test]
     fn intersection_test() {
-        let horizontal_line = LineSegment(Point(-1, 1), Point(5, 1));
-        let another_horizontal_line = LineSegment(Point(-1, 2), Point(5, 2));
-        let vertical_line = LineSegment(Point(-1, 1), Point(-1, -7));
+        let horizontal_line = LineSegment::new(Point::new(-1, 1), Point::new(5, 1));
+        let another_horizontal_line = LineSegment::new(Point::new(-1, 2), Point::new(5, 2));
+        let vertical_line = LineSegment::new(Point::new(-1, 1), Point::new(-1, -7));
         assert_eq!(
-            Some(Point(-1, 1)),
+            Some(Point::new(-1, 1)),
             horizontal_line.intersection(&vertical_line)
         );
         assert_eq!(
-            Some(Point(-1, 1)),
+            Some(Point::new(-1, 1)),
             vertical_line.intersection(&horizontal_line)
         );
         assert_eq!(None, horizontal_line.intersection(&another_horizontal_line));
