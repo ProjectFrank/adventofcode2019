@@ -1,6 +1,7 @@
 use std::{fs, iter};
+use std::convert::TryFrom;
 
-type Intcode = Vec<usize>;
+pub type Intcode = Vec<i32>;
 
 pub fn parse_intcode(code: &str) -> Intcode {
     code.split(',').map(|item| item.parse().unwrap()).collect()
@@ -10,38 +11,46 @@ pub fn read_file(path: &str) -> String {
     fs::read_to_string(path)
         .unwrap()
         .chars()
-        .filter(|&c| c.is_digit(10) || c == ',')
+        .filter(|&c| c.is_digit(10) || c == ',' || c == '-')
         .collect()
 }
 
 struct Opcode {
-    pub opcode: usize,
-    operands: Vec<usize>,
-    param_modes: Vec<usize>,
+    pub opcode: i32,
+    operands: Vec<i32>,
+    param_modes: Vec<i32>,
 }
 
-fn get_or_error(intcode: &Intcode, idx: usize) -> Result<usize, String> {
-    if let Some(&x) = intcode.get(idx) {
-        Ok(x)
+fn get_or_error(intcode: &Intcode, idx: i32) -> Result<i32, String> {
+    if let Ok(coerced_idx) = usize::try_from(idx) {
+        if let Some(&x) = intcode.get(coerced_idx) {
+            Ok(x)
+        } else {
+            Err(format!(
+                "Index out of bounds. intcode length is: {}, index is: {}",
+                intcode.len(),
+                idx
+            ))
+        }        
     } else {
-        Err(format!(
-            "Index out of bounds. intcode length is: {}, index is: {}",
-            intcode.len(),
-            idx
-        ))
+        Err(format!("Int {} could not be coerced into a usize.", idx))
     }
 }
 
-fn set_or_error(intcode: &mut Intcode, idx: usize, val: usize) -> Result<(), String> {
-    if let Some(x) = intcode.get_mut(idx) {
-        *x = val;
-        Ok(())
+fn set_or_error(intcode: &mut Intcode, idx: i32, val: i32) -> Result<(), String> {
+    if let Ok(coerced_idx) = usize::try_from(idx) {
+        if let Some(x) = intcode.get_mut(coerced_idx) {
+            *x = val;
+            Ok(())
+        } else {
+            Err(format!(
+                "Index out of bounds. intcode length is: {}, index is: {}",
+                intcode.len(),
+                idx
+            ))
+        }        
     } else {
-        Err(format!(
-            "Index out of bounds. intcode length is: {}, index is: {}",
-            intcode.len(),
-            idx
-        ))
+        Err(format!("Int {} could not be coerced into a usize.", idx))
     }
 }
 
@@ -54,7 +63,7 @@ impl Opcode {
         }
     }
 
-    fn read_params(&self, intcode: &Intcode) -> Result<Vec<usize>, String> {
+    fn read_params(&self, intcode: &Intcode) -> Result<Vec<i32>, String> {
         self.param_modes
             .iter()
             .zip(self.operands.iter())
@@ -100,11 +109,11 @@ impl Opcode {
     }
 }
 
-fn parse_opcode(num: usize) -> usize {
+fn parse_opcode(num: i32) -> i32 {
     num % 100
 }
 
-fn num_operands(opcode: usize) -> usize {
+fn num_operands(opcode: i32) -> usize {
     match opcode {
         1 => 3,
         2 => 3,
@@ -114,7 +123,7 @@ fn num_operands(opcode: usize) -> usize {
 }
 
 /// Takes a number representing parameter modes stuck to an opcode
-fn parse_parameter_modes(num: usize) -> Vec<usize> {
+fn parse_parameter_modes(num: i32) -> Vec<i32> {
     let mut parameter_modes = Vec::new();
     let mut remaining = num / 100;
     while remaining > 0 {
@@ -125,7 +134,7 @@ fn parse_parameter_modes(num: usize) -> Vec<usize> {
     parameter_modes
 }
 
-pub fn process_inputs(noun: usize, verb: usize, intcode: &mut Intcode) -> Result<usize, String> {
+pub fn process_inputs(noun: i32, verb: i32, intcode: &mut Intcode) -> Result<i32, String> {
     let mut position = 0;
 
     intcode[1] = noun;
