@@ -1,9 +1,7 @@
 use std::{fs, iter};
 use std::convert::TryFrom;
 
-pub type Intcode = Vec<i32>;
-
-pub fn parse_intcode(code: &str) -> Intcode {
+pub fn parse_intcode(code: &str) -> Vec<i32> {
     code.split(',').map(|item| item.parse().unwrap()).collect()
 }
 
@@ -21,7 +19,7 @@ struct Opcode {
     param_modes: Vec<i32>,
 }
 
-fn get_or_error(intcode: &Intcode, idx: i32) -> Result<i32, String> {
+fn get_or_error(intcode: &[i32], idx: i32) -> Result<i32, String> {
     if let Ok(coerced_idx) = usize::try_from(idx) {
         if let Some(&x) = intcode.get(coerced_idx) {
             Ok(x)
@@ -37,7 +35,7 @@ fn get_or_error(intcode: &Intcode, idx: i32) -> Result<i32, String> {
     }
 }
 
-fn set_or_error(intcode: &mut Intcode, idx: i32, val: i32) -> Result<(), String> {
+fn set_or_error(intcode: &mut Vec<i32>, idx: i32, val: i32) -> Result<(), String> {
     if let Ok(coerced_idx) = usize::try_from(idx) {
         if let Some(x) = intcode.get_mut(coerced_idx) {
             *x = val;
@@ -55,7 +53,7 @@ fn set_or_error(intcode: &mut Intcode, idx: i32, val: i32) -> Result<(), String>
 }
 
 impl Opcode {
-    pub fn execute(&self, intcode: &mut Intcode) -> Result<(), String> {
+    pub fn execute(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
         match self.opcode {
             1 => self.opcode_1(intcode),
             2 => self.opcode_2(intcode),
@@ -63,7 +61,7 @@ impl Opcode {
         }
     }
 
-    fn read_params(&self, intcode: &Intcode) -> Result<Vec<i32>, String> {
+    fn read_params(&self, intcode: &[i32]) -> Result<Vec<i32>, String> {
         self.param_modes
             .iter()
             .zip(self.operands.iter())
@@ -75,35 +73,35 @@ impl Opcode {
             .collect()
     }
 
-    fn opcode_1(&self, intcode: &mut Intcode) -> Result<(), String> {
+    fn opcode_1(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
         let read_params = self.read_params(intcode)?;
         let sum = read_params[0] + read_params[1];
         set_or_error(intcode, self.operands[2], sum)
     }
 
-    fn opcode_2(&self, intcode: &mut Intcode) -> Result<(), String> {
+    fn opcode_2(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
         let read_params = self.read_params(intcode)?;
         let product = read_params[0] * read_params[1];
         set_or_error(intcode, self.operands[2], product)
     }
 
-    pub fn new(intcode: &Intcode, position: usize) -> Self {
+    pub fn new(intcode: &[i32], position: usize) -> Self {
         let num = intcode[position];
         let opcode = parse_opcode(num);
         let num_operands = num_operands(opcode);
         let slice = intcode[position + 1..]
             .iter()
-            .map(|&x| x)
+            .copied()
             .take(num_operands);
         let param_modes = parse_parameter_modes(num)
             .iter()
-            .map(|&x| x)
+            .copied()
             .chain(iter::repeat(0))
             .take(num_operands)
             .collect();
         Self {
             operands: slice.collect(),
-            opcode: opcode,
+            opcode,
             param_modes,
         }
     }
@@ -134,7 +132,7 @@ fn parse_parameter_modes(num: i32) -> Vec<i32> {
     parameter_modes
 }
 
-pub fn process_inputs(noun: i32, verb: i32, intcode: &mut Intcode) -> Result<i32, String> {
+pub fn process_inputs(noun: i32, verb: i32, intcode: &mut Vec<i32>) -> Result<i32, String> {
     let mut position = 0;
 
     intcode[1] = noun;
