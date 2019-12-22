@@ -10,31 +10,20 @@ fn to_digits(x: u32) -> Digits {
     digits
 }
 
-fn to_number(digits: Digits) -> u32 {
-    let powers_of_10 = (0..).map(|x| 10_u32.pow(x));
-    digits
-        .iter()
-        .rev()
-        .zip(powers_of_10)
-        .fold(0, |acc, (digit, pow_10)| acc + digit * pow_10)
-}
-
-fn is_increasing(digits: &Digits) -> bool {
-    let mut clone = digits.clone();
+fn is_increasing(digits: &[u32]) -> bool {
+    let mut clone = Vec::new();
+    clone.copy_from_slice(digits);
     clone.sort();
-    *digits == clone
+    digits == &clone[..]
 }
 
-fn has_matching_digits(digits: &Digits) -> bool {
+fn has_matching_digits(digits: &[u32]) -> bool {
     let iter1 = digits.iter();
     let iter2 = digits.iter().skip(1);
-    match iter1.zip(iter2).find(|(x, y)| x == y) {
-        Some(_) => true,
-        None => false,
-    }
+    iter1.zip(iter2).any(|(x, y)| x == y)
 }
 
-fn count_consecutive_digits(digits: &Digits) -> Vec<usize> {
+fn count_consecutive_digits(digits: &[u32]) -> Vec<usize> {
     let mut streaks = Vec::new();
     let mut previous_digit = digits[0];
     let mut current_streak = 1;
@@ -55,19 +44,16 @@ fn count_consecutive_digits(digits: &Digits) -> Vec<usize> {
     streaks
 }
 
-fn has_two_matching_digits(digits: &Digits) -> bool {
-    match count_consecutive_digits(digits).iter().find(|x| **x == 2) {
-        Some(_) => true,
-        None => false,
-    }
+fn has_two_matching_digits(digits: &[u32]) -> bool {
+    count_consecutive_digits(digits).iter().any(|x| *x == 2)
 }
 
 fn count_passwords<F>(lower: u32, upper: u32, pred: F) -> u32
 where
-    F: Fn(&Digits) -> bool,
+    F: Fn(&[u32]) -> bool,
 {
     let mut num_passwords = 0;
-    for candidate_password in lower..(upper + 1) {
+    for candidate_password in lower..=upper {
         let digits = to_digits(candidate_password);
         if pred(&digits)
             && is_increasing(&digits)
@@ -81,22 +67,17 @@ where
     num_passwords
 }
 
-fn pt1(lower: u32, upper: u32) -> u32 {
+pub fn pt1(lower: u32, upper: u32) -> u32 {
     count_passwords(lower, upper, has_matching_digits)
 }
 
-fn pt2(lower: u32, upper: u32) -> u32 {
+pub fn pt2(lower: u32, upper: u32) -> u32 {
     count_passwords(lower, upper, has_two_matching_digits)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn to_digits_and_back() {
-        assert_eq!(to_number(to_digits(123456)), 123456);
-    }
 
     #[test]
     fn count_consecutive_digits_test() {

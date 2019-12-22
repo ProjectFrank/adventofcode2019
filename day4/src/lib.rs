@@ -1,5 +1,8 @@
 mod alternate;
 
+pub use alternate::pt1 as other_pt1;
+pub use alternate::pt2 as other_pt2;
+
 // a number can be modeled as the difference between the each digit,
 // going from left to right, starting with an implicit zero. For
 // example, 111111 can be modeled as 100000.
@@ -33,10 +36,7 @@ fn to_number(x: &IncreasingNumber) -> u32 {
 }
 
 fn contains_nonleading_zero(increasing_number: &IncreasingNumber) -> bool {
-    match increasing_number[1..].iter().find(|x| **x == 0) {
-        Some(_) => true,
-        None => false,
-    }
+    increasing_number[1..].iter().any(|x| *x == 0)
 }
 
 fn count_passwords<F>(lower: u32, upper: u32, pred: F) -> u32
@@ -65,7 +65,7 @@ where
     num_passwords
 }
 
-fn pt1(lower: u32, upper: u32) -> u32 {
+pub fn pt1(lower: u32, upper: u32) -> u32 {
     count_passwords(lower, upper, contains_nonleading_zero)
 }
 
@@ -91,16 +91,12 @@ fn count_consecutive_zeroes(increasing_number: &IncreasingNumber) -> Vec<usize> 
 }
 
 fn pt2_predicate(increasing_number: &IncreasingNumber) -> bool {
-    match count_consecutive_zeroes(&increasing_number)
+    count_consecutive_zeroes(&increasing_number)
         .iter()
-        .find(|x| **x == 1)
-    {
-        Some(_) => true,
-        None => false,
-    }
+        .any(|x| *x == 1)
 }
 
-fn pt2(lower: u32, upper: u32) -> u32 {
+pub fn pt2(lower: u32, upper: u32) -> u32 {
     count_passwords(lower, upper, pt2_predicate)
 }
 
@@ -109,7 +105,7 @@ mod tests {
     use super::*;
     #[test]
     fn to_number_test() {
-        assert_eq!(to_number(&[1, 1, 1, 1, 1, 1]), 123456);
+        assert_eq!(to_number(&[1, 1, 1, 1, 1, 1]), 123_456);
     }
 
     #[test]
@@ -119,11 +115,11 @@ mod tests {
 
     #[test]
     fn pt1_test() {
-        assert_eq!(pt1(134564, 585159), 1929);
+        assert_eq!(pt1(134_564, 585_159), 1929);
     }
 
     #[test]
     fn pt2_test() {
-        assert_eq!(pt2(134564, 585159), 1306);
+        assert_eq!(pt2(134_564, 585_159), 1306);
     }
 }
