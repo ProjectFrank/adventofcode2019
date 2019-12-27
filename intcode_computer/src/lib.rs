@@ -18,7 +18,7 @@ pub struct IntcodeComputer {
     intcode: Vec<i32>,
     position: usize,
     input: Vec<i32>,
-    output: Vec<i32>,
+    pub output: Vec<i32>,
 }
 
 impl IntcodeComputer {
@@ -88,6 +88,8 @@ impl Opcode {
         let result = match self.opcode {
             1 => self.opcode_1(computer),
             2 => self.opcode_2(computer),
+            3 => self.opcode_3(computer),
+            4 => self.opcode_4(computer),
             _ => Err(format!("Cannot execute opcode: {}", self.opcode)),
         };
         computer.position += self.operands.len() + 1;
@@ -116,6 +118,17 @@ impl Opcode {
         let read_params = self.read_params(&computer.intcode)?;
         let product = read_params[0] * read_params[1];
         set_or_error(&mut computer.intcode, self.operands[2], product)
+    }
+
+    fn opcode_3(&self, computer: &mut IntcodeComputer) -> Result<(), String> {
+        let input = computer.input.pop().ok_or_else(|| String::from("Out of inputs"))?;
+        set_or_error(&mut computer.intcode, self.operands[0], input)
+    }
+
+    fn opcode_4(&self, computer: &mut IntcodeComputer) -> Result<(), String> {
+        let read_params = self.read_params(&computer.intcode)?;
+        computer.output.push(read_params[0]);
+        Ok(())
     }
 
     pub fn new(intcode: &[i32], position: usize) -> Self {
@@ -148,6 +161,8 @@ fn num_operands(opcode: i32) -> usize {
     match opcode {
         1 => 3,
         2 => 3,
+        3 => 1,
+        4 => 1,
         99 => 0,
         _ => panic!("Unknown opcode: {}", opcode),
     }
@@ -170,7 +185,7 @@ pub fn process_inputs(noun: i32, verb: i32, computer: &mut IntcodeComputer) -> R
     computer.intcode[1] = noun;
     computer.intcode[2] = verb;
 
-    computer.run();
+    computer.run()?;
 
     Ok(computer.intcode[0])
 }
@@ -201,5 +216,12 @@ mod tests {
         assert_eq!(operation.operands, vec![4, 3, 4]);
         assert_eq!(operation.param_modes, vec![0, 1, 0]);
         assert_eq!(operation.opcode, 2);
+    }
+
+    #[test]
+    fn input_output_works() {
+        let mut computer = IntcodeComputer::new("3,0,4,0,99", vec![5]);
+        computer.run().unwrap();
+        assert_eq!(computer.output, vec![5]);
     }
 }
