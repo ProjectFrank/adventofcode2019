@@ -13,6 +13,37 @@ pub fn read_file(path: &str) -> String {
         .collect()
 }
 
+#[derive(Clone)]
+pub struct IntcodeComputer {
+    intcode: Vec<i32>,
+    position: usize,
+    input: Vec<i32>,
+    output: Vec<i32>,
+}
+
+impl IntcodeComputer {
+    pub fn new(raw_intcode: &str, input: Vec<i32>) -> Self {
+        Self {
+            intcode: parse_intcode(raw_intcode),
+            input,
+            output: Vec::new(),
+            position: 0
+        }
+    }
+
+    pub fn run(&mut self) -> Result<(), String> {
+        while self.position < self.intcode.len() {
+            let operation = Opcode::new(&self.intcode, self.position);
+            if operation.opcode == 99 {
+                return Ok(());
+            } else {
+                operation.execute(self)?;
+            }
+        }
+        Err(String::from("EOF error"))
+    }
+}
+
 struct Opcode {
     pub opcode: i32,
     operands: Vec<i32>,
@@ -53,12 +84,14 @@ fn set_or_error(intcode: &mut Vec<i32>, idx: i32, val: i32) -> Result<(), String
 }
 
 impl Opcode {
-    pub fn execute(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
-        match self.opcode {
-            1 => self.opcode_1(intcode),
-            2 => self.opcode_2(intcode),
+    pub fn execute(&self, computer: &mut IntcodeComputer) -> Result<(), String> {
+        let result = match self.opcode {
+            1 => self.opcode_1(computer),
+            2 => self.opcode_2(computer),
             _ => Err(format!("Cannot execute opcode: {}", self.opcode)),
-        }
+        };
+        computer.position += self.operands.len() + 1;
+        result
     }
 
     fn read_params(&self, intcode: &[i32]) -> Result<Vec<i32>, String> {
@@ -73,16 +106,16 @@ impl Opcode {
             .collect()
     }
 
-    fn opcode_1(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
-        let read_params = self.read_params(intcode)?;
+    fn opcode_1(&self, computer: &mut IntcodeComputer) -> Result<(), String> {
+        let read_params = self.read_params(&computer.intcode)?;
         let sum = read_params[0] + read_params[1];
-        set_or_error(intcode, self.operands[2], sum)
+        set_or_error(&mut computer.intcode, self.operands[2], sum)
     }
 
-    fn opcode_2(&self, intcode: &mut Vec<i32>) -> Result<(), String> {
-        let read_params = self.read_params(intcode)?;
+    fn opcode_2(&self, computer: &mut IntcodeComputer) -> Result<(), String> {
+        let read_params = self.read_params(&computer.intcode)?;
         let product = read_params[0] * read_params[1];
-        set_or_error(intcode, self.operands[2], product)
+        set_or_error(&mut computer.intcode, self.operands[2], product)
     }
 
     pub fn new(intcode: &[i32], position: usize) -> Self {
@@ -132,23 +165,14 @@ fn parse_parameter_modes(num: i32) -> Vec<i32> {
     parameter_modes
 }
 
-pub fn process_inputs(noun: i32, verb: i32, intcode: &mut Vec<i32>) -> Result<i32, String> {
-    let mut position = 0;
+pub fn process_inputs(noun: i32, verb: i32, computer: &mut IntcodeComputer) -> Result<i32, String> {
 
-    intcode[1] = noun;
-    intcode[2] = verb;
+    computer.intcode[1] = noun;
+    computer.intcode[2] = verb;
 
-    while position < intcode.len() {
-        let operation = Opcode::new(&intcode, position);
-        if operation.opcode == 99 {
-            return Ok(intcode[0]);
-        } else {
-            operation.execute(intcode)?;
-        }
-        position += 4;
-    }
+    computer.run();
 
-    Err(String::from("EOF error"))
+    Ok(computer.intcode[0])
 }
 
 #[cfg(test)]
@@ -156,18 +180,18 @@ mod tests {
     use super::*;
     #[test]
     fn opcode_1_test() {
-        let mut intcode = parse_intcode("1,9,10,3,2,3,11,0,99,30,40,50");
-        let operation = Opcode::new(&intcode, 0);
-        operation.execute(&mut intcode);
-        assert_eq!(vec![1, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], intcode);
+        let mut computer = IntcodeComputer::new("1,9,10,3,2,3,11,0,99,30,40,50", Vec::new());
+        let operation = Opcode::new(&computer.intcode, 0);
+        operation.execute(&mut computer).unwrap();
+        assert_eq!(vec![1, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], computer.intcode);
     }
 
     #[test]
     fn opcode_2_test() {
-        let mut intcode = parse_intcode("1,9,10,70,2,3,11,0,99,30,40,50");
-        let operation = Opcode::new(&intcode, 4);
-        operation.execute(&mut intcode);
-        assert_eq!(vec![3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], intcode);
+        let mut computer = IntcodeComputer::new("1,9,10,70,2,3,11,0,99,30,40,50", Vec::new());
+        let operation = Opcode::new(&computer.intcode, 4);
+        operation.execute(&mut computer).unwrap();
+        assert_eq!(vec![3500, 9, 10, 70, 2, 3, 11, 0, 99, 30, 40, 50], computer.intcode);
     }
 
     #[test]
