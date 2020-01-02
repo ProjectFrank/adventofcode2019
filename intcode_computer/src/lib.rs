@@ -1,6 +1,8 @@
+use std::cell::RefCell;
+use std::cmp::PartialEq;
+use std::collections::VecDeque;
 use std::convert::TryFrom;
 use std::default::Default;
-use std::thread::sleep_ms;
 use std::{fs, iter};
 
 pub fn parse_intcode(code: &str) -> Vec<i32> {
@@ -15,34 +17,72 @@ pub fn read_file(path: &str) -> String {
         .collect()
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
+pub enum State {
+    WaitingForInput,
+    Terminated,
+    Running,
+    Initialized,
+}
+
 pub struct IntcodeComputer {
     intcode: Vec<i32>,
     position: usize,
-    input: Vec<i32>,
+    input: VecDeque<i32>,
     pub output: Vec<i32>,
+    pub state: State,
 }
 
 impl IntcodeComputer {
     pub fn new(raw_intcode: &str, input: Vec<i32>) -> Self {
         Self {
             intcode: parse_intcode(raw_intcode),
-            input,
+            input: input.iter().rev().copied().collect(),
             output: Vec::new(),
             position: 0,
+            state: State::Initialized,
         }
     }
 
     pub fn run(&mut self) -> Result<(), String> {
-        while self.position < self.intcode.len() {
+        self.state = State::Running;
+        while self.position < self.intcode.len() && self.state == State::Running {
             let operation = Opcode::new(&self.intcode, self.position);
             if operation.opcode == 99 {
-                return Ok(());
+                self.state = State::Terminated;
             } else {
                 operation.execute(self)?;
             }
         }
-        Err(String::from("EOF error"))
+
+        match self.state {
+            State::Running => Err(String::from("EOF error")),
+            State::WaitingForInput | State::Terminated => Ok(()),
+            _ => Err(String::from("This shouldn't have happened.")),
+        }
+    }
+
+    pub fn consume_input(&mut self) -> Option<i32> {
+        self.input.pop_back()
+    }
+
+    pub fn feed_input(&mut self, input: i32) -> Result<(), String> {
+        self.input.push_front(input);
+        match self.state {
+            State::Terminated => Err(String::from(
+                "Attempted to feed input to terminated computer.",
+            )),
+            State::WaitingForInput => {
+                self.run()?;
+                Ok(())
+            }
+            _ => Ok(()),
+        }
+    }
+
+    fn produce_output(&mut self, output: i32) -> Result<(), String> {
+        self.output.push(output);
+        Ok(())
     }
 }
 
@@ -59,6 +99,7 @@ struct Operation {
     set_value: Option<(i32, i32)>,
     /// Position in intcode to jump to
     jump_to: Option<i32>,
+    wait: bool,
 }
 
 fn get_or_error(intcode: &[i32], idx: i32) -> Result<i32, String> {
@@ -113,8 +154,11 @@ impl Opcode {
         }
         if let Some(position) = operation.jump_to {
             computer.position = usize::try_from(position).unwrap();
-        } else {
+        } else if !operation.wait {
             computer.position += self.operands.len() + 1;
+        }
+        if operation.wait {
+            computer.state = State::WaitingForInput;
         }
         Ok(())
     }
@@ -150,19 +194,22 @@ impl Opcode {
     }
 
     fn opcode_3(&self, computer: &mut IntcodeComputer) -> Result<Operation, String> {
-        let input = computer
-            .input
-            .pop()
-            .ok_or_else(|| String::from("Out of inputs"))?;
-        Ok(Operation {
-            set_value: Some((self.operands[0], input)),
-            ..Default::default()
-        })
+        if let Some(input) = computer.consume_input() {
+            Ok(Operation {
+                set_value: Some((self.operands[0], input)),
+                ..Default::default()
+            })
+        } else {
+            Ok(Operation {
+                wait: true,
+                ..Default::default()
+            })
+        }
     }
 
     fn opcode_4(&self, computer: &mut IntcodeComputer) -> Result<Operation, String> {
         let read_params = self.read_params(&computer.intcode)?;
-        computer.output.push(read_params[0]);
+        computer.produce_output(read_params[0])?;
         Ok(Default::default())
     }
 
